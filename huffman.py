@@ -1,6 +1,14 @@
 # -*- Mode: Python -*-
 
-# this table is built from rfc????.
+# this file generates the 'huffman_table' in hpack.py
+#  at first, I thought I would play with using different-sized
+#  chunks of bits to make a series of tables... for example, the
+#  smallest code is 5 bits, and the largest is 30.  This invites
+#  a code divided into 5-bit chunks.
+# For now, I'm going to stick to the 1-bit code (i.e., a binary tree)
+#  since this leads to a very compact ASCII representation.
+
+# this table is built from rfc????, the HPACK spec.
 codes = [
     '1111111111000',
     '11111111111111111011000',
@@ -265,37 +273,47 @@ codes = list (enumerate (codes))
 
 def build_tree (codes, width=5, depth=0):
     d = {}
+    # collect all the subtrees under each 
+    #   unique prefix of <width> bits.
     for char, code in codes:
         c0, c1 = code[:width], code[width:]
         n = int (c0, 2)
         x = d.setdefault (n, [])
         x.append ((char, c1))
+    # if width == 5, r has 32 entries.
     r = [None] * (1 << width)
     for n, subs in d.items():
         if len(subs) == 1:
+            # this is a leaf node.
             (char, code) = subs[0]
             assert (code == '')
             r[n] = char
         else:
+            # this is a subtree.
             r[n] = build_tree (subs, width, depth+1)
     return r
 
+# print a table of width, rough-size-of-table-in-source...
 for width in range (1, 9):
     print width, len (repr (build_tree (codes, width)))
 
+# ... which shows that the binary tree is the most
+#   compact (no surprise, I suppose).
+
+# Note: everything below assumes a width of 1 (i.e., binary tree).
 # ok, this is the data structure we *want*.
 print build_tree (codes, 1)
 # but placing it in the source code like that is a bit
 #  of a mess.  let's come up with a more compact representation.
-# let's do this: every time there's a split, let's put a '.' char.
+# instead: every time there's a split, let's put a '.' char.
 # since all the splits are binary...
 # so, we start off with:
 # [[[[[48, 49] ...
 # this should become ....30313261
-# let's use a small sub-tree for testing.
-# [[48, 49], [50, 97]]
+# for example,
+#   [[48, 49], [50, 97]]
 # should become
-# ..30313261
+#   ..30313261
 # and we should be able to convert back as well.
 
 def hexint (n):
