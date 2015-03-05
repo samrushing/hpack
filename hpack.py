@@ -145,8 +145,10 @@ class Decoder:
 
     masks = {i : (1<<i)-1 for i in (4,5,6,7)}
         
-    def get_integer (self, nprefix):
-        mask = self.masks[nprefix]
+    def get_integer (self, nbits):
+        # fetch an integer from the lower <nbits> of
+        #   the current byte.
+        mask = self.masks[nbits]
         r = self.byte & mask
         if r == mask:
             # more octets
