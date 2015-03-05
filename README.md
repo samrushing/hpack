@@ -1,7 +1,7 @@
 HPACK
 =====
 
-An implementation of HPACK in Python/Cython.
+An implementation of [HPACK](http://http2.github.io/http2-spec/compression.html) in Python/Cython.
 
 Note
 ----
