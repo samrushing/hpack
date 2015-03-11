@@ -67,6 +67,12 @@ static_table = [
 
 nstatic = len(static_table)
 
+static_map = {}
+for i, key in static_table:
+    static_map[key] = i
+
+# convert from ascii to a binary tree.
+#   each leaf is a character.
 def from_ascii (s, pos=0):
     if s[pos] == '.':
         pos += 1
@@ -91,6 +97,60 @@ huffman_table, _ = from_ascii (
     'df.f1f4...f5f6.f7f8..fafb.fcfd....fe.0203..0405.0607...080b.0c0e..0f10.1112....1'
     '314.1517..1819.1a1b...1c1d.1e1f..7fdc.f9..0a0d.16Z'
 )
+
+# build a map from byte -> (num, bits)
+#  e.g. huffman_map[ord('A')] = (33, 6)
+def make_huffman_map (t):
+    m = {}
+    def loop (t, n, bits):
+        if isinstance (t, int):
+            m[t] = (n, bits)
+        else:
+            loop (t[0], n << 1 | 0, bits + 1)
+            loop (t[1], n << 1 | 1, bits + 1)
+    loop (t, 0, 0)
+    return m
+
+huffman_map = make_huffman_map (huffman_table)
+
+masks = {i : (1<<i)-1 for i in (1,2,3,4,5,6,7)}
+
+class HuffmanEncoder:
+
+    def __init__ (self):
+        self.data = []
+        self.left = 8
+        self.byte = 0
+
+    def emit_byte (self):
+        self.data.append (chr (self.byte))
+        self.left = 8
+        self.byte = 0
+
+    def emit (self, n, bits):
+        while bits:
+            slice = min (self.left, bits)
+            shift = bits - slice
+            self.byte <<= slice 
+            self.byte |= n >> shift & masks[slice]
+            bits -= slice
+            self.left -= slice
+            if self.left == 0:
+                self.emit_byte()
+
+    def encode (self, s):
+        for ch in s:
+            code, bits = huffman_map[ord(ch)]
+            self.emit (code, bits)
+
+    def done (self):
+        self.emit (0xffffffff, self.left)
+        return ''.join (self.data)
+                          
+def huffman_encode (s):
+    h = HuffmanEncoder()
+    h.encode (s)
+    return h.done()
 
 class DynamicTable:
 
@@ -143,12 +203,10 @@ class Decoder:
         assert (len(result) == n)
         return result
 
-    masks = {i : (1<<i)-1 for i in (4,5,6,7)}
-        
     def get_integer (self, nbits):
         # fetch an integer from the lower <nbits> of
         #   the current byte.
-        mask = self.masks[nbits]
+        mask = masks[nbits]
         r = self.byte & mask
         if r == mask:
             # more octets
@@ -223,3 +281,54 @@ class Decoder:
                 if self.pos == stop:
                     return ''.join (r)
         return ''.join (r)
+
+class Encoder:
+
+    def __init__ (self, headers, table):
+        self.headers = headers
+        self.table = table
+        self.data = []
+
+    def emit (self, b):
+        self.data.append (chr(b))
+
+    def emit_integer (self, n0, n1_bits, n1):
+        mask = masks[n1_bits]
+        if n1 < mask:
+            self.emit ((n0 << n1_bits) | n1)
+        else:
+            self.emit ((n0 << n1_bits) | mask)
+            n1 -= mask
+            while n1:
+                if n1 < 0b01111111111:
+                    self.emit (0b10000000 & n1)
+                else:
+                    self.emit (n1)
+
+    def emit_literal (self, s):
+        s0 = huffman_encode (s)
+        if len(s0) > len(s):
+            # oops, not huffman-friendly
+            self.emit_integer (0b0, 7, len(s))
+            self.data.append (s)
+        else:
+            self.emit_integer (0b1, 7, len(s0))
+            self.data.append (s0)
+
+    def emit_header (self, name, val):
+        index = static_map.get ((name, val), None)
+        if index is not None:
+            emit_integer (1, 7, index)
+        else:
+            index = static_map.get ((name, None), None)
+            if index is not None:
+                emit_integer (0b01, 6, index)
+                emit_literal (val)
+            else:
+                emit_literal (name)
+                emit_literal (val)
+
+    def __call__ (self):
+        for name, val in self.headers:
+            pass
+
