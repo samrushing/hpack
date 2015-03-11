@@ -34,4 +34,8 @@ def t1():
     for test in tests:
         t0 (test)
 
-t1()
+#t1()
+h = HuffmanEncoder()
+h.encode ('www.example.com')
+print h.done().encode('hex')
+
