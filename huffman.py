@@ -8,6 +8,8 @@
 # For now, I'm going to stick to the 1-bit code (i.e., a binary tree)
 #  since this leads to a very compact ASCII representation.
 
+# the 'right' way to do this is probably with a radix tree/patricia trie/judy array.
+
 # this table is built from rfc????, the HPACK spec.
 codes = [
     '1111111111000',
