@@ -7,7 +7,8 @@ Status
 ------
 
 Decoder works.  Encoder works, but does not yet make use of the
-DynamicTable.  This code is being tested with shrapnel's h2 server.
+DynamicTable.  This code is being tested with shrapnel's h2
+server (which is currently in the 's2n' branch).
 
 Purpose
 -------
