@@ -68,7 +68,7 @@ static_table = [
 nstatic = len(static_table)
 
 static_map = {}
-for i, key in static_table:
+for i, key in enumerate (static_table):
     static_map[key] = i
 
 # convert from ascii to a binary tree.
@@ -131,7 +131,7 @@ class HuffmanEncoder:
         while bits:
             slice = min (self.left, bits)
             shift = bits - slice
-            self.byte <<= slice 
+            self.byte <<= slice
             self.byte |= n >> shift & masks[slice]
             bits -= slice
             self.left -= slice
@@ -146,7 +146,7 @@ class HuffmanEncoder:
     def done (self):
         self.emit (0xffffffff, self.left)
         return ''.join (self.data)
-                          
+
 def huffman_encode (s):
     h = HuffmanEncoder()
     h.encode (s)
@@ -154,10 +154,10 @@ def huffman_encode (s):
 
 class DynamicTable:
 
-    def __init__ (self):
+    def __init__ (self, max_size=1024):
         self.table = []
         self.size = 0
-        self.max_size = 1024
+        self.max_size = max_size
 
     def __getitem__ (self, index):
         if index < nstatic:
@@ -168,23 +168,38 @@ class DynamicTable:
     def entry_size (self, name, val):
         return len(name) + len(val) + 32
 
+    def evict_one (self):
+        (k, v) = self.table.pop()
+        self.size -= self.entry_size (k, v)
+        print 'evicted', k, v, self.size
+
     def __setitem__ (self, name, val):
-        self.table.append ((name, val))
-        self.size += self.entry_size (name, val)
+        es = self.entry_size (name, val)
+        while self.size + es > self.max_size:
+            self.evict_one()
+        self.table.insert (0, (name, val))
+        self.size += es
 
     def set_size (self, size):
-        # eviction, etc..
-        import pdb; pdb.set_trace()
+        self.max_size = size
+        while self.size > self.max_size:
+            self.evict_one()
 
 class Decoder:
 
-    def __init__ (self, data, table):
-        self.data = data
+    def __init__ (self, table=None):
+        self.data = ''
         self.pos = 0
         # used when pulling off huffman-encoded bits.
         self.bpos = 0
+        if table is None:
+            table = DynamicTable()
         self.dyn = table
-        
+
+    def feed (self, data):
+        self.data = data
+        self.pos = 0
+
     @property
     def done (self):
         return self.pos >= len(self.data)
@@ -215,7 +230,7 @@ class Decoder:
                 self.next_byte()
                 r <<= 7
                 r |= self.byte & 0x7f
-                if self.byte & 0x80:
+                if not self.byte & 0x80:
                     break
             self.next_byte()
             return r + mask
@@ -284,8 +299,10 @@ class Decoder:
 
 class Encoder:
 
-    def __init__ (self, headers, table):
-        self.headers = headers
+    def __init__ (self, table=None):
+        # not used yet.
+        if table is None:
+            table = DynamicTable()
         self.table = table
         self.data = []
 
@@ -299,11 +316,12 @@ class Encoder:
         else:
             self.emit ((n0 << n1_bits) | mask)
             n1 -= mask
-            while n1:
-                if n1 < 0b01111111111:
-                    self.emit (0b10000000 & n1)
-                else:
-                    self.emit (n1)
+            # encode remaining bits 7 at a time...
+            while n1 >= 0b10000000:
+                self.emit ((n1 & 0b01111111) | 0b10000000)
+                n1 >>= 7
+            # and any leftover (or 0).
+            self.emit (n1)
 
     def emit_literal (self, s):
         s0 = huffman_encode (s)
@@ -318,17 +336,35 @@ class Encoder:
     def emit_header (self, name, val):
         index = static_map.get ((name, val), None)
         if index is not None:
-            emit_integer (1, 7, index)
+            # index name and value
+            self.emit_integer (1, 7, index)
         else:
             index = static_map.get ((name, None), None)
+            # XXX no dyntable yet
+            index = None
             if index is not None:
-                emit_integer (0b01, 6, index)
-                emit_literal (val)
+                # index name, literal value
+                self.emit_integer (0b0000, 4, index)
+                self.emit_literal (val)
             else:
-                emit_literal (name)
-                emit_literal (val)
+                # literal name, literal value
+                self.emit_integer (0b0000, 4, 0)
+                self.emit_literal (name)
+                self.emit_literal (val)
 
-    def __call__ (self):
-        for name, val in self.headers:
-            pass
-
+    def __call__ (self, hset):
+        self.data = []
+        # rfc7540 8.1.2.1 Pseudo-Header Fields requires that
+        #   pseudo-headers precede normal headers.
+        pseudo = []
+        normal = []
+        for name, vals in hset:
+            if name.startswith (':'):
+                pseudo.append ((name, vals))
+            else:
+                normal.append ((name, vals))
+        items = pseudo + normal
+        for name, vals in items:
+            for val in vals:
+                self.emit_header (name, val)
+        return ''.join (self.data)
