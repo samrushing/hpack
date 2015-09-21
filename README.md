@@ -3,10 +3,11 @@ HPACK
 
 An implementation of [HPACK](http://http2.github.io/http2-spec/compression.html) in Python/Cython.
 
-Note
-----
+Status
+------
 
-This code is in progress.
+Decoder works.  Encoder works, but does not yet make use of the
+DynamicTable.  This code is being tested with shrapnel's h2 server.
 
 Purpose
 -------
