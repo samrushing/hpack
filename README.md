@@ -6,9 +6,14 @@ An implementation of [HPACK](http://http2.github.io/http2-spec/compression.html)
 Status
 ------
 
-Decoder works.  Encoder works, but does not yet make use of the
-DynamicTable.  This code is being tested with shrapnel's h2
-server (which is currently in the 's2n' branch).
+Decoder and encoder work.  The encoder makes use of the dynamic table,
+but is not incredibly sophisticated.  The encoder could detect usage
+patterns in headers - e.g., a header like 'Date' that changes its value
+often might flood the dynamic table - this could probably be detected
+and avoided.
+
+There are some requirements around the 'cookie' header I haven't
+looked at yet.
 
 Purpose
 -------
