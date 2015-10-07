@@ -10,7 +10,7 @@
 
 # the 'right' way to do this is probably with a radix tree/patricia trie/judy array.
 
-# this table is built from rfc????, the HPACK spec.
+# this table is built from rfc7541, the HPACK spec.
 codes = [
     '1111111111000',
     '11111111111111111011000',
@@ -275,7 +275,7 @@ codes = list (enumerate (codes))
 
 def build_tree (codes, width=5, depth=0):
     d = {}
-    # collect all the subtrees under each 
+    # collect all the subtrees under each
     #   unique prefix of <width> bits.
     for char, code in codes:
         c0, c1 = code[:width], code[width:]
