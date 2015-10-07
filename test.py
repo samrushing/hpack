@@ -307,5 +307,11 @@ class TestEncoder (unittest.TestCase):
             encoded = e.flush()
             self.assertEquals (d.decode (encoded), pairs)
 
+    def test_3 (self):
+        # test for correct multi-digit endian behavior.
+        d = hpack.Decoder()
+        d.data = '\x0f\x83\x01'
+        assert d.get_integer (4) == 146
+
 if __name__ == '__main__':
     unittest.main()
