@@ -219,6 +219,13 @@ class TestDecoder (unittest.TestCase):
         self.assertEquals (d.decode (HD (enc2)), exp2)
         self.assertEquals (t.size, 215)
 
+    def test_endian (self):
+        # test for correct multi-digit endian behavior.
+        d = hpack.Decoder()
+        d.data = '\x0f\x83\x01'
+        assert d.get_integer (4) == 146
+
+
 getty = (
     "Four score and seven years ago our fathers brought forth on this continent, a new nation,"
     " conceived in Liberty, and dedicated to the proposition that all men are created equal."
@@ -306,12 +313,6 @@ class TestEncoder (unittest.TestCase):
                 e.emit_header (name, val)
             encoded = e.flush()
             self.assertEquals (d.decode (encoded), pairs)
-
-    def test_3 (self):
-        # test for correct multi-digit endian behavior.
-        d = hpack.Decoder()
-        d.data = '\x0f\x83\x01'
-        assert d.get_integer (4) == 146
 
 if __name__ == '__main__':
     unittest.main()
